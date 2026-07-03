@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Мої оцінки — {{ student }}{% endblock %}
+{% block content %}
+<h3>Мої оцінки — {{ student }}</h3>
+<p class="text-muted">Група: {{ student.group }} · № зач. книжки: {{ student.record_book_number }}</p>
+
+<div class="table-responsive mb-4">
+<table class="table bg-white shadow-sm">
+<thead><tr><th>Дисципліна</th><th>Тип</th><th>Заняття №</th><th>Оцінка</th><th>Макс.</th></tr></thead>
+<tbody>
+{% for g in grades %}
+<tr>
+  <td>{{ g.lesson.assignment.discipline }}</td>
+  <td>{{ g.lesson.get_lesson_type_display }}</td>
+  <td>{{ g.lesson.order_number }}</td>
+  <td><strong>{{ g.value }}</strong></td>
+  <td class="text-muted">{{ g.lesson.max_grade|default:"—" }}</td>
+</tr>
+{% empty %}
+<tr><td colspan="5" class="text-muted">Оцінок ще немає.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<h5>Відвідуваність</h5>
+<div class="table-responsive">
+<table class="table bg-white shadow-sm">
+<thead><tr><th>Дисципліна</th><th>Тип</th><th>Заняття №</th><th>Статус</th></tr></thead>
+<tbody>
+{% for a in attendance %}
+<tr>
+  <td>{{ a.lesson.assignment.discipline }}</td>
+  <td>{{ a.lesson.get_lesson_type_display }}</td>
+  <td>{{ a.lesson.order_number }}</td>
+  <td>{{ a.get_status_display }}</td>
+</tr>
+{% empty %}
+<tr><td colspan="4" class="text-muted">Даних ще немає.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endblock %}

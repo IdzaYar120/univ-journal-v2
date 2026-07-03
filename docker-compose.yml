@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_DB: university_journal
+      POSTGRES_USER: journal_user
+      POSTGRES_PASSWORD: journal_pass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  web:
+    build: .
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py seed_demo &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: university_journal
+      POSTGRES_USER: journal_user
+      POSTGRES_PASSWORD: journal_pass
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: "*"
+
+volumes:
+  pgdata:

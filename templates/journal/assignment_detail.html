@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}{{ assignment.discipline }} — {{ assignment.group }}{% endblock %}
+{% block content %}
+<a href="{% url 'journal:dashboard' %}" class="text-decoration-none">&larr; Мої журнали</a>
+<h3 class="mt-2">{{ assignment.discipline }} — {{ assignment.group }} <small class="text-muted">({{ assignment.semester }})</small></h3>
+
+{% if no_lessons %}
+<div class="alert alert-warning mt-3">
+  <strong>Сітку ще не створено.</strong>
+  Кількість занять (лекцій / практичних / лабораторних) задається деканатом або адміністратором
+  у <a href="/admin/journal/teacherassignment/{{ assignment.id }}/change/">адмін-панелі</a>.
+</div>
+<h5>Студенти групи ({{ students|length }})</h5>
+<ul class="list-group">
+{% for s in students %}
+  <li class="list-group-item">{{ s }} <span class="text-muted">({{ s.record_book_number }})</span></li>
+{% endfor %}
+</ul>
+{% else %}
+
+<div class="d-flex gap-2 mb-3 align-items-center">
+  <a href="{% url 'journal:gradebook_matrix' assignment.id %}" class="btn btn-outline-secondary btn-sm">Зведена таблиця (read-only)</a>
+  <span id="save-status" class="text-muted small ms-2"></span>
+</div>
+
+<div class="table-responsive">
+<table class="table table-bordered table-sm bg-white shadow-sm align-middle" id="journal-grid" style="font-size: 0.85rem;">
+  <thead class="table-dark text-center">
+    <tr>
+      <th rowspan="2" class="align-middle" style="min-width: 200px; position: sticky; left: 0; z-index: 2; background: #212529;">Студент</th>
+      {% for type_label, group in lessons_by_type %}
+        <th colspan="{{ group|length }}" class="text-center">{{ type_label }}</th>
+      {% endfor %}
+      <th rowspan="2" class="align-middle text-center" style="min-width: 60px;">Σ</th>
+    </tr>
+    <tr>
+      {% for lesson in all_lessons %}
+        <th class="text-center" style="min-width: 65px;">{{ lesson.order_number }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {# ===== РЯДОК МАКСИМАЛЬНИХ ОЦІНОК (виділений жовтим) ===== #}
+    <tr style="background-color: #fff3cd;">
+      <td class="fw-bold" style="background-color: #fff3cd; position: sticky; left: 0; z-index: 1;">
+        <span class="text-warning-emphasis">⚙ Макс. оцінка</span>
+      </td>
+      {% for lesson in all_lessons %}
+        <td class="text-center p-1" style="background-color: #fff3cd;">
+          <input type="text"
+                 class="form-control form-control-sm text-center cell-input cell-maxgrade"
+                 style="width: 60px; font-weight: bold;"
+                 data-lesson-id="{{ lesson.id }}"
+                 value="{{ lesson.max_grade|default_if_none:'' }}"
+                 placeholder="—">
+        </td>
+      {% endfor %}
+      <td class="text-center fw-bold" style="background-color: #fff3cd;">—</td>
+    </tr>
+    {# ===== РЯДКИ СТУДЕНТІВ ===== #}
+    {% for row in student_rows %}
+    <tr>
+      <td class="text-nowrap" style="position: sticky; left: 0; z-index: 1; background: #fff;">
+        {{ row.student }}
+        <div class="text-muted small">{{ row.student.record_book_number }}</div>
+      </td>
+      {% for cell in row.cells %}
+        <td class="text-center p-1 {% if cell.is_absent %}cell-absent{% endif %}">
+          <input type="text"
+                 class="form-control form-control-sm text-center cell-input cell-grade"
+                 style="width: 60px;"
+                 data-student-id="{{ cell.student_id }}"
+                 data-lesson-id="{{ cell.lesson_id }}"
+                 value="{{ cell.display }}"
+                 placeholder="—">
+        </td>
+      {% endfor %}
+      <td class="text-center fw-bold cell-total" data-student-id="{{ row.student.id }}">{{ row.total }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="{{ all_lessons|length|add:2 }}" class="text-muted">Немає студентів у групі.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% endif %}
+
+<style>
+  .cell-absent {
+    background-color: #f8d7da !important;
+  }
+  .cell-absent input {
+    background-color: #f8d7da !important;
+    color: #842029 !important;
+    font-weight: bold;
+  }
+  .cell-input {
+    border: 1px solid #dee2e6;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .cell-input:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.25);
+  }
+  .cell-saved {
+    background-color: #d1e7dd !important;
+  }
+  .cell-error {
+    background-color: #f8d7da !important;
+    box-shadow: 0 0 0 0.15rem rgba(220, 53, 69, 0.4) !important;
+  }
+  #save-status {
+    transition: opacity 0.3s;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const SAVE_URL = "{% url 'journal:save_cell' assignment.id %}";
+  const CSRF = "{{ csrf_token }}";
+  const statusEl = document.getElementById('save-status');
+
+  function showStatus(text, color) {
+    statusEl.textContent = text;
+    statusEl.style.color = color || '#6c757d';
+    // Зникає через 2 секунди
+    clearTimeout(statusEl._timer);
+    statusEl._timer = setTimeout(() => { statusEl.textContent = ''; }, 2000);
+  }
+
+  function flashCell(input, cls) {
+    input.classList.add(cls);
+    setTimeout(() => input.classList.remove(cls), 600);
+  }
+
+  function updateAbsentStyle(input) {
+    const td = input.closest('td');
+    const val = input.value.trim().toLowerCase();
+    if (val === 'н' || val === 'n') {
+      td.classList.add('cell-absent');
+    } else {
+      td.classList.remove('cell-absent');
+    }
+  }
+
+  function recalcTotal(studentId) {
+    let sum = 0;
+    document.querySelectorAll(`.cell-grade[data-student-id="${studentId}"]`).forEach(inp => {
+      const v = parseInt(inp.value, 10);
+      if (!isNaN(v) && v > 0) sum += v;
+    });
+    const totalCell = document.querySelector(`.cell-total[data-student-id="${studentId}"]`);
+    if (totalCell) totalCell.textContent = sum || 0;
+  }
+
+  async function saveCell(input) {
+    const lessonId = parseInt(input.dataset.lessonId, 10);
+    const studentId = input.dataset.studentId ? parseInt(input.dataset.studentId, 10) : null;
+    const value = input.value.trim();
+
+    showStatus('Збереження...', '#0d6efd');
+
+    try {
+      const resp = await fetch(SAVE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF,
+        },
+        body: JSON.stringify({
+          lesson_id: lessonId,
+          student_id: studentId,
+          value: value,
+        }),
+      });
+
+      const data = await resp.json();
+
+      if (data.ok) {
+        flashCell(input, 'cell-saved');
+        showStatus('✓ Збережено', '#198754');
+
+        // Оновити стиль відсутності
+        if (studentId !== null) {
+          updateAbsentStyle(input);
+          recalcTotal(studentId);
+        }
+      } else {
+        flashCell(input, 'cell-error');
+        showStatus('✗ ' + (data.error || 'Помилка'), '#dc3545');
+      }
+    } catch (err) {
+      flashCell(input, 'cell-error');
+      showStatus("✗ Мережева помилка", '#dc3545');
+    }
+  }
+
+  // Зберігати при втраті фокусу (blur) або Enter
+  document.querySelectorAll('.cell-input').forEach(input => {
+    let lastValue = input.value;
+
+    input.addEventListener('blur', function() {
+      if (this.value !== lastValue) {
+        lastValue = this.value;
+        saveCell(this);
+      }
+    });
+
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.blur();
+      }
+      // Tab — стандартна поведінка браузера (перехід до наступного input)
+    });
+
+    // Початковий стиль для відсутніх
+    updateAbsentStyle(input);
+  });
+});
+</script>
+{% endblock %}

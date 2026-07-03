@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Зведена таблиця — {{ assignment.discipline }}{% endblock %}
+{% block content %}
+<a href="{% url 'journal:assignment_detail' assignment.id %}" class="text-decoration-none">&larr; Назад до журналу</a>
+<h3 class="mt-2">Зведена таблиця — {{ assignment.discipline }} / {{ assignment.group }}</h3>
+
+{% if all_lessons %}
+<div class="table-responsive">
+<table class="table table-bordered table-sm bg-white shadow-sm" style="font-size: 0.85rem;">
+  <thead class="table-dark text-center">
+    <tr>
+      <th rowspan="2" class="align-middle" style="min-width: 200px;">Студент</th>
+      {% for type_label, group in lessons_by_type %}
+        <th colspan="{{ group|length }}" class="text-center">{{ type_label }}</th>
+      {% endfor %}
+      <th rowspan="2" class="align-middle text-center">Σ</th>
+    </tr>
+    <tr>
+      {% for l in all_lessons %}
+        <th class="text-center" style="min-width: 45px;">{{ l.order_number }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {# Рядок максимальних оцінок #}
+    <tr style="background-color: #fff3cd;">
+      <td class="fw-bold" style="background-color: #fff3cd;">⚙ Макс. оцінка</td>
+      {% for l in all_lessons %}
+        <td class="text-center fw-bold" style="background-color: #fff3cd;">{{ l.max_grade|default:"—" }}</td>
+      {% endfor %}
+      <td class="text-center" style="background-color: #fff3cd;">—</td>
+    </tr>
+    {# Рядки студентів #}
+    {% for row in table %}
+    <tr>
+      <td class="text-nowrap">{{ row.student }}</td>
+      {% for c in row.cells %}
+        <td class="text-center {% if c.is_absent %}cell-absent{% endif %}">
+          {% if c.is_absent %}<strong class="text-danger">н</strong>{% else %}{{ c.display }}{% endif %}
+        </td>
+      {% endfor %}
+      <td class="text-center fw-bold">{{ row.total }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="2" class="text-muted">Немає студентів або занять.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<style>
+  .cell-absent {
+    background-color: #f8d7da !important;
+  }
+</style>
+{% else %}
+<div class="alert alert-info mt-3">Сітку ще не створено. Задайте кількість занять в адмін-панелі.</div>
+{% endif %}
+{% endblock %}

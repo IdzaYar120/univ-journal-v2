@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Мої журнали</h3>
+{% if assignments %}
+<div class="table-responsive">
+<table class="table table-striped bg-white shadow-sm">
+<thead><tr><th>Дисципліна</th><th>Група</th><th>Семестр</th><th>Викладач</th><th></th></tr></thead>
+<tbody>
+{% for a in assignments %}
+<tr>
+  <td>{{ a.discipline }}</td>
+  <td>{{ a.group }}</td>
+  <td>{{ a.semester }}</td>
+  <td>{{ a.teacher }}</td>
+  <td class="text-end">
+    <a class="btn btn-sm btn-primary" href="{% url 'journal:assignment_detail' a.id %}">Журнал</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'journal:gradebook_matrix' a.id %}">Зведена таблиця</a>
+  </td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<p>У вас ще немає доступу до жодного журналу. Зверніться до деканату для отримання дозволу на конкретну дисципліну/групу.</p>
+{% endif %}
+{% endblock %}
