@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Результат імпорту{% endblock %}
+{% block content %}
+<a href="{% url 'import_export:import_hub' %}" class="text-decoration-none">&larr; Назад до імпорту</a>
+<h3 class="mt-2">✅ Імпорт завершено</h3>
+
+<div class="card mt-3 shadow-sm" style="max-width: 600px;">
+  <div class="card-body">
+    {% if import_type == "students" %}
+      <h5 class="card-title">👥 Студенти</h5>
+      <ul class="list-unstyled mb-0">
+        <li>✅ Створено: <strong>{{ results.created }}</strong></li>
+        <li>⏭ Пропущено (вже існують): <strong>{{ results.skipped }}</strong></li>
+        {% if results.errors %}
+        <li class="text-danger">❌ Помилок: <strong>{{ results.errors|length }}</strong></li>
+        {% endif %}
+      </ul>
+
+      {% if preview_rows %}
+      <hr>
+      <h6>Створені облікові записи:</h6>
+      <div class="table-responsive">
+      <table class="table table-bordered table-sm" style="font-size: 0.85rem;">
+        <thead class="table-light"><tr><th>Прізвище Імʼя</th><th>Логін</th><th>Тимчасовий пароль</th></tr></thead>
+        <tbody>
+          {% for row in preview_rows %}
+            {% if row.username %}
+            <tr>
+              <td>{{ row.last_name }} {{ row.first_name }}</td>
+              <td><code>{{ row.username }}</code></td>
+              <td><code>{{ row.password }}</code></td>
+            </tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <div class="alert alert-warning mt-2 mb-0">
+        ⚠️ Збережіть цю таблицю — тимчасові паролі показуються лише один раз!
+      </div>
+      {% endif %}
+
+    {% elif import_type == "structure" %}
+      <h5 class="card-title">🏫 Структура / Дисципліни</h5>
+      <ul class="list-unstyled mb-0">
+        <li>✅ Створено: <strong>{{ results.created }}</strong></li>
+        <li>⏭ Пропущено (вже існують): <strong>{{ results.skipped }}</strong></li>
+      </ul>
+
+    {% elif import_type == "gradebook" %}
+      <h5 class="card-title">📊 Журнал оцінок</h5>
+      <ul class="list-unstyled mb-0">
+        <li>✅ Оцінок збережено: <strong>{{ results.grades_saved }}</strong></li>
+        <li>🚫 Відсутностей (н): <strong>{{ results.absent_saved }}</strong></li>
+        <li>⚙ Макс. оцінок встановлено: <strong>{{ results.max_grades_saved }}</strong></li>
+        {% if results.errors %}
+        <li class="text-danger">❌ Помилок: <strong>{{ results.errors|length }}</strong></li>
+        {% endif %}
+      </ul>
+    {% endif %}
+
+    {% if results.errors %}
+    <hr>
+    <h6 class="text-danger">Помилки:</h6>
+    <ul class="small text-danger">
+      {% for e in results.errors %}
+        <li>{{ e }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+</div>
+
+<div class="mt-3">
+  <a href="{% url 'import_export:import_hub' %}" class="btn btn-primary">Повернутись до імпорту</a>
+  <a href="{% url 'journal:dashboard' %}" class="btn btn-outline-secondary">Перейти до журналів</a>
+</div>
+{% endblock %}

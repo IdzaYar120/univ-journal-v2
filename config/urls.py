@@ -10,5 +10,6 @@ urlpatterns = [
         name="login",
     ),
     path("accounts/logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("import/", include("import_export.urls")),
     path("", include("journal.urls")),
 ]

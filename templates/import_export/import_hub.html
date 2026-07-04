@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Імпорт даних{% endblock %}
+{% block content %}
+<h3>📥 Імпорт даних з CSV / Excel</h3>
+<p class="text-muted">Експортуйте дані з Google Sheets як CSV або Excel (.xlsx), потім завантажте тут.</p>
+
+<div class="row g-4 mt-2">
+  <div class="col-md-4">
+    <div class="card h-100 shadow-sm border-primary">
+      <div class="card-body">
+        <h5 class="card-title">👥 Студенти</h5>
+        <p class="card-text">Імпорт списку студентів: прізвище, імʼя, група, номер залікової. Автоматично створює облікові записи.</p>
+        <a href="{% url 'import_export:import_students' %}" class="btn btn-primary">Імпортувати студентів</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100 shadow-sm border-success">
+      <div class="card-body">
+        <h5 class="card-title">🏫 Структура / Дисципліни</h5>
+        <p class="card-text">Факультети, спеціальності, групи або дисципліни. Дублікати не створюються.</p>
+        <a href="{% url 'import_export:import_structure' %}" class="btn btn-success">Імпортувати структуру</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100 shadow-sm border-warning">
+      <div class="card-body">
+        <h5 class="card-title">📊 Журнал оцінок</h5>
+        <p class="card-text">Сітка оцінок з Google Sheets: студенти × заняття. Включно з макс. оцінками та «н».</p>
+        <a href="{% url 'import_export:import_gradebook' %}" class="btn btn-warning">Імпортувати оцінки</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<a href="{% url 'import_export:import_hub' %}" class="text-decoration-none">&larr; Назад до імпорту</a>
+<h3 class="mt-2">{{ title }}</h3>
+<p class="text-muted">{{ description }}</p>
+
+<form method="post" enctype="multipart/form-data" class="mt-3">
+  {% csrf_token %}
+
+  {% if import_type == "gradebook" and assignments %}
+  <div class="mb-3" style="max-width: 500px;">
+    <label for="assignment_id" class="form-label fw-bold">Журнал (дисципліна / група):</label>
+    <select name="assignment_id" id="assignment_id" class="form-select" required>
+      <option value="">— оберіть журнал —</option>
+      {% for a in assignments %}
+        <option value="{{ a.id }}">{{ a.discipline }} — {{ a.group }} ({{ a.semester }})</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
+  <div class="mb-3" style="max-width: 500px;">
+    <label for="file" class="form-label fw-bold">Файл (.csv або .xlsx):</label>
+    <input type="file" name="file" id="file" class="form-control" accept=".csv,.xlsx" required>
+  </div>
+
+  <button type="submit" class="btn btn-primary">📄 Завантажити та переглянути</button>
+</form>
+
+<div class="mt-4">
+  <h6>Приклад формату:</h6>
+  {% if import_type == "students" %}
+  <div class="table-responsive" style="max-width: 700px;">
+    <table class="table table-bordered table-sm bg-white">
+      <thead class="table-light"><tr><th>Прізвище</th><th>Імʼя</th><th>По батькові</th><th>Група</th><th>№ зачітної книжки</th></tr></thead>
+      <tbody>
+        <tr><td>Іванов</td><td>Іван</td><td>Іванович</td><td>ІПЗ-101</td><td>2025-0001</td></tr>
+        <tr><td>Петрова</td><td>Марія</td><td>Олегівна</td><td>ІПЗ-101</td><td>2025-0002</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% elif import_type == "structure" %}
+  <p class="small text-muted">Для структури:</p>
+  <div class="table-responsive" style="max-width: 800px;">
+    <table class="table table-bordered table-sm bg-white">
+      <thead class="table-light"><tr><th>Факультет</th><th>Код факультету</th><th>Спеціальність</th><th>Код спеціальності</th><th>Група</th><th>Курс</th></tr></thead>
+      <tbody>
+        <tr><td>ФІТ</td><td>FIT</td><td>Інженерія ПЗ</td><td>121</td><td>ІПЗ-101</td><td>1</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small text-muted mt-2">Для дисциплін:</p>
+  <div class="table-responsive" style="max-width: 400px;">
+    <table class="table table-bordered table-sm bg-white">
+      <thead class="table-light"><tr><th>Назва дисципліни</th><th>Код дисципліни</th></tr></thead>
+      <tbody>
+        <tr><td>Основи програмування</td><td>OP-101</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% elif import_type == "gradebook" %}
+  <div class="table-responsive" style="max-width: 600px;">
+    <table class="table table-bordered table-sm bg-white">
+      <thead class="table-light"><tr><th>Студент</th><th>Лекція 1</th><th>Лекція 2</th><th>Лаб 1</th></tr></thead>
+      <tbody>
+        <tr style="background-color: #fff3cd;"><td><em>Макс. оцінка</em></td><td>10</td><td>10</td><td>20</td></tr>
+        <tr><td>Іванов І.І.</td><td>8</td><td>н</td><td>15</td></tr>
+        <tr><td>Петрова М.О.</td><td>10</td><td>9</td><td>18</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
