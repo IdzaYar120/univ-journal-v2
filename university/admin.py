@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from journal.models import TeacherAssignment
 from .models import CurriculumEntry, Discipline, Faculty, Group, Semester, Specialty, Student
 
 
@@ -10,13 +11,20 @@ class StructureManagedAdmin(admin.ModelAdmin):
     лише до конкретних журналів через TeacherAssignment (див. журнал -> journal.admin).
     """
 
-    def has_module_permission(self, request):
-        u = request.user
-        return u.is_authenticated and (u.is_superuser or getattr(u, "role", None) in ("admin", "dean"))
+    def _is_dean_or_admin(self, user):
+        return user.is_authenticated and (user.is_superuser or getattr(user, "role", None) in ("admin", "dean"))
 
-    has_view_permission = has_module_permission
-    has_add_permission = has_module_permission
-    has_change_permission = has_module_permission
+    def has_module_permission(self, request):
+        return self._is_dean_or_admin(request.user)
+
+    def has_view_permission(self, request, obj=None):
+        return self._is_dean_or_admin(request.user)
+
+    def has_add_permission(self, request):
+        return self._is_dean_or_admin(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return self._is_dean_or_admin(request.user)
 
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser or getattr(request.user, "role", None) == "admin"
@@ -42,13 +50,21 @@ class StudentInline(admin.TabularInline):
     autocomplete_fields = ("user",)
 
 
+class TeacherAssignmentInline(admin.TabularInline):
+    model = TeacherAssignment
+    extra = 0
+    autocomplete_fields = ("teacher", "discipline", "semester")
+    verbose_name = "Дисципліна групи (призначення викладача та пар)"
+    verbose_name_plural = "Дисципліни групи (призначення викладачів та обсяг пар)"
+
+
 @admin.register(Group)
 class GroupAdmin(StructureManagedAdmin):
     list_display = ("name", "specialty", "course", "curator")
     list_filter = ("specialty__faculty", "specialty", "course")
     search_fields = ("name",)
     autocomplete_fields = ("specialty", "curator")
-    inlines = [StudentInline]
+    inlines = [StudentInline, TeacherAssignmentInline]
 
 
 @admin.register(Student)
