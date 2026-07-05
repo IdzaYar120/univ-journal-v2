@@ -20,6 +20,7 @@
 
 <div class="d-flex gap-2 mb-3 align-items-center">
   <a href="{% url 'journal:gradebook_matrix' assignment.id %}" class="btn btn-outline-secondary btn-sm">Зведена таблиця (read-only)</a>
+  <a href="{% url 'import_export:export_gradebook_excel' assignment.id %}" class="btn btn-outline-success btn-sm">📥 Завантажити в Excel</a>
   <span id="save-status" class="text-muted small ms-2"></span>
 </div>
 

@@ -186,3 +186,191 @@ def import_gradebook(request):
         "description": "Завантажте CSV/Excel з сіткою оцінок. Перший рядок — заголовки (Лекція 1, Лаб 2...), другий — макс. оцінки, далі — студенти.",
         "assignments": assignments,
     })
+
+
+from django.http import HttpResponse
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+import openpyxl
+from journal.permissions import get_assignment_or_403
+from university.models import Student
+from journal.models import Lesson, Grade, Attendance
+
+@login_required
+def export_gradebook_excel(request, assignment_id):
+    """Експортує вказаний журнал в Excel файл."""
+    assignment = get_assignment_or_403(request.user, assignment_id)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Журнал оцінок"
+
+    # Дані
+    all_lessons = list(assignment.lessons.order_by("lesson_type", "order_number"))
+    students = list(
+        Student.objects.filter(group=assignment.group, is_active=True)
+        .select_related("user")
+        .order_by("user__last_name")
+    )
+
+    # Оцінки та відсутності
+    grades_qs = Grade.objects.filter(lesson__assignment=assignment, grade_type=Grade.GradeType.CURRENT)
+    grade_map = {(g.student_id, g.lesson_id): g.value for g in grades_qs}
+
+    absent_qs = Attendance.objects.filter(lesson__assignment=assignment, status=Attendance.Status.ABSENT)
+    absent_set = {(a.student_id, a.lesson_id) for a in absent_qs}
+
+    # Стилі
+    font_bold = Font(name="Calibri", size=11, bold=True)
+    font_regular = Font(name="Calibri", size=11)
+    font_danger = Font(name="Calibri", size=11, bold=True, color="842029")
+
+    fill_header = PatternFill(start_color="212529", end_color="212529", fill_type="solid")
+    font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+
+    fill_max = PatternFill(start_color="FFF3CD", end_color="FFF3CD", fill_type="solid")
+    fill_absent = PatternFill(start_color="F8D7DA", end_color="F8D7DA", fill_type="solid")
+
+    thin_side = Side(border_style="thin", color="DEE2E6")
+    border_all = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+
+    align_center = Alignment(horizontal="center", vertical="center")
+    align_left = Alignment(horizontal="left", vertical="center")
+
+    # Назва журналу
+    ws.append([])
+    ws.append([f"Електронний журнал: {assignment.discipline}"])
+    ws.append([f"Група: {assignment.group} ({assignment.semester})"])
+    ws.append([f"Викладач: {assignment.teacher.get_full_name()}"])
+    ws.append([])
+
+    for row in range(2, 5):
+        ws.cell(row=row, column=1).font = font_bold
+
+    start_row = 6
+
+    # Заголовки типів занять
+    ws.cell(row=start_row, column=1, value="Студент").font = font_header
+    ws.cell(row=start_row, column=1).fill = fill_header
+    ws.cell(row=start_row, column=1).alignment = align_center
+    ws.cell(row=start_row, column=1).border = border_all
+
+    ws.cell(row=start_row+1, column=1, value="").fill = fill_header
+    ws.cell(row=start_row+1, column=1).border = border_all
+
+    # Об'єднуємо назву "Студент" на два рядки
+    ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row+1, end_column=1)
+
+    # Групуємо заняття
+    type_order = [
+        (Lesson.Type.LECTURE, "Лекції"),
+        (Lesson.Type.PRACTICE, "Практичні"),
+        (Lesson.Type.LAB, "Лабораторні"),
+    ]
+
+    current_col = 2
+    for lt, label in type_order:
+        lessons_group = [l for l in all_lessons if l.lesson_type == lt]
+        if lessons_group:
+            ws.cell(row=start_row, column=current_col, value=label).font = font_header
+            ws.cell(row=start_row, column=current_col).fill = fill_header
+            ws.cell(row=start_row, column=current_col).alignment = align_center
+            ws.cell(row=start_row, column=current_col).border = border_all
+
+            if len(lessons_group) > 1:
+                ws.merge_cells(start_row=start_row, start_column=current_col, end_row=start_row, end_column=current_col + len(lessons_group) - 1)
+
+                for c in range(current_col + 1, current_col + len(lessons_group)):
+                    ws.cell(row=start_row, column=c).fill = fill_header
+                    ws.cell(row=start_row, column=c).border = border_all
+
+            for idx, lesson in enumerate(lessons_group):
+                col = current_col + idx
+                ws.cell(row=start_row+1, column=col, value=lesson.order_number).font = font_header
+                ws.cell(row=start_row+1, column=col).fill = fill_header
+                ws.cell(row=start_row+1, column=col).alignment = align_center
+                ws.cell(row=start_row+1, column=col).border = border_all
+
+            current_col += len(lessons_group)
+
+    # Стовпець Суми
+    ws.cell(row=start_row, column=current_col, value="Σ").font = font_header
+    ws.cell(row=start_row, column=current_col).fill = fill_header
+    ws.cell(row=start_row, column=current_col).alignment = align_center
+    ws.cell(row=start_row, column=current_col).border = border_all
+
+    ws.cell(row=start_row+1, column=current_col, value="").fill = fill_header
+    ws.cell(row=start_row+1, column=current_col).border = border_all
+    ws.merge_cells(start_row=start_row, start_column=current_col, end_row=start_row+1, end_column=current_col)
+
+    # Рядок Макс. оцінок
+    max_row_idx = start_row + 2
+    ws.cell(row=max_row_idx, column=1, value="⚙ Макс. оцінка").font = font_bold
+    ws.cell(row=max_row_idx, column=1).fill = fill_max
+    ws.cell(row=max_row_idx, column=1).border = border_all
+
+    for idx, lesson in enumerate(all_lessons):
+        col = 2 + idx
+        max_val = lesson.max_grade if lesson.max_grade is not None else "—"
+        cell = ws.cell(row=max_row_idx, column=col, value=max_val)
+        cell.font = font_bold
+        cell.fill = fill_max
+        cell.alignment = align_center
+        cell.border = border_all
+
+    ws.cell(row=max_row_idx, column=current_col, value="—").font = font_bold
+    ws.cell(row=max_row_idx, column=current_col).fill = fill_max
+    ws.cell(row=max_row_idx, column=current_col).alignment = align_center
+    ws.cell(row=max_row_idx, column=current_col).border = border_all
+
+    # Рядки студентів
+    for s_idx, student in enumerate(students):
+        r = max_row_idx + 1 + s_idx
+        student_name = f"{student.user.last_name} {student.user.first_name}"
+        ws.cell(row=r, column=1, value=student_name).font = font_regular
+        ws.cell(row=r, column=1).alignment = align_left
+        ws.cell(row=r, column=1).border = border_all
+
+        total = 0
+        for l_idx, lesson in enumerate(all_lessons):
+            col = 2 + l_idx
+            is_absent = (student.id, lesson.id) in absent_set
+            grade_val = grade_map.get((student.id, lesson.id))
+
+            cell = ws.cell(row=r, column=col)
+            cell.alignment = align_center
+            cell.border = border_all
+
+            if is_absent:
+                cell.value = "н"
+                cell.font = font_danger
+                cell.fill = fill_absent
+            elif grade_val is not None:
+                cell.value = grade_val
+                cell.font = font_regular
+                total += grade_val
+            else:
+                cell.value = ""
+
+        # Загальний бал
+        t_cell = ws.cell(row=r, column=current_col, value=total)
+        t_cell.font = font_bold
+        t_cell.alignment = align_center
+        t_cell.border = border_all
+
+    # Вирівнювання ширини першого стовпчика
+    max_len = max(len(f"{s.user.last_name} {s.user.first_name}") for s in students) if students else 20
+    ws.column_dimensions["A"].width = max(max_len + 3, 20)
+
+    for c in range(2, current_col + 1):
+        col_letter = get_column_letter(c)
+        ws.column_dimensions[col_letter].width = 8
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    filename = f"gradebook_{assignment.group.name}_{assignment.discipline.code}.xlsx"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    wb.save(response)
+    return response

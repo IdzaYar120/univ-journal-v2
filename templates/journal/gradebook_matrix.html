@@ -2,7 +2,10 @@
 {% block title %}Зведена таблиця — {{ assignment.discipline }}{% endblock %}
 {% block content %}
 <a href="{% url 'journal:assignment_detail' assignment.id %}" class="text-decoration-none">&larr; Назад до журналу</a>
-<h3 class="mt-2">Зведена таблиця — {{ assignment.discipline }} / {{ assignment.group }}</h3>
+<div class="d-flex justify-content-between align-items-center mt-2 mb-3">
+  <h3 class="mb-0">Зведена таблиця — {{ assignment.discipline }} / {{ assignment.group }}</h3>
+  <a href="{% url 'import_export:export_gradebook_excel' assignment.id %}" class="btn btn-success btn-sm">📥 Завантажити в Excel</a>
+</div>
 
 {% if all_lessons %}
 <div class="table-responsive">

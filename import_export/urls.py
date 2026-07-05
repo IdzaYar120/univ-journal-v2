@@ -9,4 +9,5 @@ urlpatterns = [
     path("students/", views.import_students, name="import_students"),
     path("structure/", views.import_structure, name="import_structure"),
     path("gradebook/", views.import_gradebook, name="import_gradebook"),
+    path("export-excel/<int:assignment_id>/", views.export_gradebook_excel, name="export_gradebook_excel"),
 ]
