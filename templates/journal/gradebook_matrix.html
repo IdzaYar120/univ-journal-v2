@@ -17,6 +17,8 @@
         <th colspan="{{ group|length }}" class="text-center">{{ type_label }}</th>
       {% endfor %}
       <th rowspan="2" class="align-middle text-center">Σ</th>
+      <th rowspan="2" class="align-middle text-center">ECTS</th>
+      <th rowspan="2" class="align-middle text-center">Оцінка</th>
     </tr>
     <tr>
       {% for l in all_lessons %}
@@ -27,10 +29,12 @@
   <tbody>
     {# Рядок максимальних оцінок #}
     <tr style="background-color: #fff3cd;">
-      <td class="fw-bold" style="background-color: #fff3cd;">⚙ Макс. оцінка</td>
+      <td class="fw-bold" style="background-color: #fff3cd;">⚙ Макс. оцінка (Σ: {{ total_max_grade }})</td>
       {% for l in all_lessons %}
         <td class="text-center fw-bold" style="background-color: #fff3cd;">{{ l.max_grade|default:"—" }}</td>
       {% endfor %}
+      <td class="text-center" style="background-color: #fff3cd;">—</td>
+      <td class="text-center" style="background-color: #fff3cd;">—</td>
       <td class="text-center" style="background-color: #fff3cd;">—</td>
     </tr>
     {# Рядки студентів #}
@@ -43,6 +47,8 @@
         </td>
       {% endfor %}
       <td class="text-center fw-bold">{{ row.total }}</td>
+      <td class="text-center fw-bold {% if row.ects == 'FX' or row.ects == 'F' %}text-danger{% else %}text-success{% endif %}">{{ row.ects }}</td>
+      <td class="text-center {% if row.ects == 'FX' or row.ects == 'F' %}text-danger{% else %}text-success{% endif %}">{{ row.national }}</td>
     </tr>
     {% empty %}
     <tr><td colspan="2" class="text-muted">Немає студентів або занять.</td></tr>

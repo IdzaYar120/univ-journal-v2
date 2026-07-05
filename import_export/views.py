@@ -303,6 +303,26 @@ def export_gradebook_excel(request, assignment_id):
     ws.cell(row=start_row+1, column=current_col).border = border_all
     ws.merge_cells(start_row=start_row, start_column=current_col, end_row=start_row+1, end_column=current_col)
 
+    # Стовпець ECTS
+    ws.cell(row=start_row, column=current_col + 1, value="ECTS").font = font_header
+    ws.cell(row=start_row, column=current_col + 1).fill = fill_header
+    ws.cell(row=start_row, column=current_col + 1).alignment = align_center
+    ws.cell(row=start_row, column=current_col + 1).border = border_all
+
+    ws.cell(row=start_row+1, column=current_col + 1, value="").fill = fill_header
+    ws.cell(row=start_row+1, column=current_col + 1).border = border_all
+    ws.merge_cells(start_row=start_row, start_column=current_col + 1, end_row=start_row+1, end_column=current_col + 1)
+
+    # Стовпець Національна оцінка
+    ws.cell(row=start_row, column=current_col + 2, value="Оцінка").font = font_header
+    ws.cell(row=start_row, column=current_col + 2).fill = fill_header
+    ws.cell(row=start_row, column=current_col + 2).alignment = align_center
+    ws.cell(row=start_row, column=current_col + 2).border = border_all
+
+    ws.cell(row=start_row+1, column=current_col + 2, value="").fill = fill_header
+    ws.cell(row=start_row+1, column=current_col + 2).border = border_all
+    ws.merge_cells(start_row=start_row, start_column=current_col + 2, end_row=start_row+1, end_column=current_col + 2)
+
     # Рядок Макс. оцінок
     max_row_idx = start_row + 2
     ws.cell(row=max_row_idx, column=1, value="⚙ Макс. оцінка").font = font_bold
@@ -322,6 +342,12 @@ def export_gradebook_excel(request, assignment_id):
     ws.cell(row=max_row_idx, column=current_col).fill = fill_max
     ws.cell(row=max_row_idx, column=current_col).alignment = align_center
     ws.cell(row=max_row_idx, column=current_col).border = border_all
+
+    for c in (current_col + 1, current_col + 2):
+        ws.cell(row=max_row_idx, column=c, value="—").font = font_bold
+        ws.cell(row=max_row_idx, column=c).fill = fill_max
+        ws.cell(row=max_row_idx, column=c).alignment = align_center
+        ws.cell(row=max_row_idx, column=c).border = border_all
 
     # Рядки студентів
     for s_idx, student in enumerate(students):
@@ -358,13 +384,36 @@ def export_gradebook_excel(request, assignment_id):
         t_cell.alignment = align_center
         t_cell.border = border_all
 
+        # Розрахунок ECTS та Національної
+        percentage = (total / total_max_grade * 100) if total_max_grade > 0 else 0
+        from journal.views import get_ects_and_national
+        if total_max_grade > 0:
+            ects, national = get_ects_and_national(percentage)
+        else:
+            ects, national = get_ects_and_national(total)
+
+        # ECTS
+        ects_cell = ws.cell(row=r, column=current_col + 1, value=ects)
+        ects_cell.font = font_bold
+        ects_cell.alignment = align_center
+        ects_cell.border = border_all
+
+        # Національна
+        nat_cell = ws.cell(row=r, column=current_col + 2, value=national)
+        nat_cell.font = font_regular
+        nat_cell.alignment = align_center
+        nat_cell.border = border_all
+
     # Вирівнювання ширини першого стовпчика
     max_len = max(len(f"{s.user.last_name} {s.user.first_name}") for s in students) if students else 20
     ws.column_dimensions["A"].width = max(max_len + 3, 20)
 
-    for c in range(2, current_col + 1):
+    for c in range(2, current_col + 3):
         col_letter = get_column_letter(c)
-        ws.column_dimensions[col_letter].width = 8
+        if c == current_col + 2:
+            ws.column_dimensions[col_letter].width = 18
+        else:
+            ws.column_dimensions[col_letter].width = 8
 
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

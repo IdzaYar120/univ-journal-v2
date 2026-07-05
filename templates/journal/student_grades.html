@@ -1,44 +1,96 @@
 {% extends "base.html" %}
 {% block title %}Мої оцінки — {{ student }}{% endblock %}
 {% block content %}
-<h3>Мої оцінки — {{ student }}</h3>
-<p class="text-muted">Група: {{ student.group }} · № зач. книжки: {{ student.record_book_number }}</p>
+<h3 class="mb-1">Мої оцінки — {{ student }}</h3>
+<p class="text-muted mb-4">Група: {{ student.group }} · № залікової книжки: {{ student.record_book_number }}</p>
 
-<div class="table-responsive mb-4">
-<table class="table bg-white shadow-sm">
-<thead><tr><th>Дисципліна</th><th>Тип</th><th>Заняття №</th><th>Оцінка</th><th>Макс.</th></tr></thead>
-<tbody>
-{% for g in grades %}
-<tr>
-  <td>{{ g.lesson.assignment.discipline }}</td>
-  <td>{{ g.lesson.get_lesson_type_display }}</td>
-  <td>{{ g.lesson.order_number }}</td>
-  <td><strong>{{ g.value }}</strong></td>
-  <td class="text-muted">{{ g.lesson.max_grade|default:"—" }}</td>
-</tr>
-{% empty %}
-<tr><td colspan="5" class="text-muted">Оцінок ще немає.</td></tr>
-{% endfor %}
-</tbody>
-</table>
-</div>
+<div class="row g-4">
+  {% for summary in discipline_summaries %}
+  <div class="col-12">
+    <div class="card shadow-sm bg-white border-0 rounded-3">
+      <div class="card-body p-4">
+        <!-- Заголовок відомості -->
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+          <div>
+            <h4 class="card-title fw-bold mb-1 text-primary">{{ summary.assignment.discipline.name }}</h4>
+            <div class="text-muted small">
+              👨‍🏫 Викладач: {{ summary.assignment.teacher.get_full_name }} &middot; 📅 Семестр: {{ summary.assignment.semester }}
+            </div>
+          </div>
+          
+          <!-- Рейтинговий блок ECTS -->
+          <div class="d-flex align-items-center gap-2">
+            <div class="px-3 py-2 rounded text-center {% if summary.ects == 'FX' or summary.ects == 'F' %}bg-danger-subtle text-danger{% else %}bg-success-subtle text-success{% endif %}" style="min-width: 75px;">
+              <div class="fs-4 fw-bold lh-1">{{ summary.ects }}</div>
+              <div class="small fw-semibold" style="font-size: 0.7rem;">ECTS</div>
+            </div>
+            <div class="px-3 py-2 rounded text-center {% if summary.ects == 'FX' or summary.ects == 'F' %}bg-danger-subtle text-danger{% else %}bg-success-subtle text-success{% endif %}" style="min-width: 100px;">
+              <div class="fs-6 fw-bold lh-1">{{ summary.national }}</div>
+              <div class="small fw-semibold" style="font-size: 0.7rem;">Національна</div>
+            </div>
+          </div>
+        </div>
 
-<h5>Відвідуваність</h5>
-<div class="table-responsive">
-<table class="table bg-white shadow-sm">
-<thead><tr><th>Дисципліна</th><th>Тип</th><th>Заняття №</th><th>Статус</th></tr></thead>
-<tbody>
-{% for a in attendance %}
-<tr>
-  <td>{{ a.lesson.assignment.discipline }}</td>
-  <td>{{ a.lesson.get_lesson_type_display }}</td>
-  <td>{{ a.lesson.order_number }}</td>
-  <td>{{ a.get_status_display }}</td>
-</tr>
-{% empty %}
-<tr><td colspan="4" class="text-muted">Даних ще немає.</td></tr>
-{% endfor %}
-</tbody>
-</table>
+        <!-- Прогрес бар по балах -->
+        <div class="mb-3">
+          <div class="d-flex justify-content-between text-muted small mb-1">
+            <span>Накопичено балів: <strong>{{ summary.total_score }}</strong> з <strong>{{ summary.total_max_grade }}</strong></span>
+            <span>{% widthratio summary.total_score summary.total_max_grade 100 as pct %}{{ pct|default:"0" }}%</span>
+          </div>
+          <div class="progress" style="height: 10px;">
+            <div class="progress-bar {% if summary.ects == 'FX' or summary.ects == 'F' %}bg-danger{% else %}bg-success{% endif %}" 
+                 role="progressbar" 
+                 style="width: {% widthratio summary.total_score summary.total_max_grade 100 %}%"></div>
+          </div>
+        </div>
+
+        <!-- Кнопка розгортання деталей -->
+        <button class="btn btn-sm btn-outline-secondary" 
+                type="button" 
+                data-bs-toggle="collapse" 
+                data-bs-target="#details-{{ summary.assignment.id }}" 
+                aria-expanded="false" 
+                aria-controls="details-{{ summary.assignment.id }}">
+          🔍 Детальна відомість занять
+        </button>
+
+        <!-- Розгортання таблиці оцінок -->
+        <div class="collapse mt-3" id="details-{{ summary.assignment.id }}">
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm align-middle mb-0" style="font-size: 0.85rem;">
+              <thead class="table-light text-center">
+                <tr>
+                  <th>Тип заняття</th>
+                  <th style="width: 120px;">Номер заняття</th>
+                  <th style="width: 120px;">Ваша оцінка</th>
+                  <th style="width: 120px;">Макс. бал</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for detail in summary.lesson_details %}
+                <tr class="{% if detail.is_absent %}table-danger{% endif %}">
+                  <td>{{ detail.lesson.get_lesson_type_display }}</td>
+                  <td class="text-center">{{ detail.lesson.order_number }}</td>
+                  <td class="text-center fw-bold">
+                    {% if detail.is_absent %}
+                      <span class="text-danger fw-bold">н</span>
+                    {% else %}
+                      {{ detail.grade|default:"—" }}
+                    {% endif %}
+                  </td>
+                  <td class="text-center text-muted">{{ detail.lesson.max_grade|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12 text-muted">Ви ще не записані на жодну дисципліну або заняття не створені.</div>
+  {% endfor %}
 </div>
 {% endblock %}

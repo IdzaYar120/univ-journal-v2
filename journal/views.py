@@ -12,6 +12,23 @@ from .models import Attendance, Grade, Lesson
 from .permissions import get_assignment_or_403, get_teacher_assignments
 
 
+def get_ects_and_national(score_percentage):
+    if score_percentage >= 90:
+        return "A", "Відмінно"
+    elif score_percentage >= 82:
+        return "B", "Добре"
+    elif score_percentage >= 74:
+        return "C", "Добре"
+    elif score_percentage >= 64:
+        return "D", "Задовільно"
+    elif score_percentage >= 60:
+        return "E", "Задовільно"
+    elif score_percentage >= 35:
+        return "FX", "Незадовільно (FX)"
+    else:
+        return "F", "Незадовільно (F)"
+
+
 @login_required
 def dashboard(request):
     """Стартова сторінка: студент бачить власні оцінки, решта — список
@@ -95,6 +112,7 @@ def assignment_detail(request, assignment_id):
         })
 
     # Побудувати рядки для шаблону
+    total_max_grade = sum(l.max_grade for l in all_lessons if l.max_grade is not None)
     student_rows = []
     for student in students:
         cells = []
@@ -115,10 +133,19 @@ def assignment_detail(request, assignment_id):
                 "display": display,
                 "is_absent": is_absent,
             })
+
+        percentage = (total / total_max_grade * 100) if total_max_grade > 0 else 0
+        if total_max_grade > 0:
+            ects, national = get_ects_and_national(percentage)
+        else:
+            ects, national = get_ects_and_national(total)
+
         student_rows.append({
             "student": student,
             "cells": cells,
             "total": total,
+            "ects": ects,
+            "national": national,
         })
 
     return render(request, "journal/assignment_detail.html", {
@@ -127,6 +154,7 @@ def assignment_detail(request, assignment_id):
         "all_lessons": all_lessons,
         "students": students,
         "student_rows": student_rows,
+        "total_max_grade": total_max_grade,
         "no_lessons": False,
     })
 
@@ -238,6 +266,7 @@ def gradebook_matrix(request, assignment_id):
     grade_map = ctx["grade_map"]
     absent_set = ctx["absent_set"]
 
+    total_max_grade = sum(l.max_grade for l in all_lessons if l.max_grade is not None)
     table = []
     for s in ctx["students"]:
         cells = []
@@ -252,7 +281,20 @@ def gradebook_matrix(request, assignment_id):
                 total += grade_val
             else:
                 cells.append({"display": "", "is_absent": False})
-        table.append({"student": s, "cells": cells, "total": total})
+
+        percentage = (total / total_max_grade * 100) if total_max_grade > 0 else 0
+        if total_max_grade > 0:
+            ects, national = get_ects_and_national(percentage)
+        else:
+            ects, national = get_ects_and_national(total)
+
+        table.append({
+            "student": s,
+            "cells": cells,
+            "total": total,
+            "ects": ects,
+            "national": national,
+        })
 
     return render(
         request,
@@ -262,22 +304,78 @@ def gradebook_matrix(request, assignment_id):
             "lessons_by_type": ctx["lessons_by_type"],
             "all_lessons": all_lessons,
             "table": table,
+            "total_max_grade": total_max_grade,
         },
     )
 
 
 @login_required
 def my_grades(request):
-    """Особистий кабінет студента: лише читання власних оцінок і відвідуваності."""
+    """Особистий кабінет студента: зведена відомість дисциплін з ECTS рейтингом та відвідуваністю."""
     student = get_object_or_404(Student, user=request.user)
-    grades = (
-        Grade.objects.filter(student=student)
-        .select_related("lesson__assignment__discipline", "lesson__assignment__semester")
-        .order_by("lesson__assignment__discipline__name", "lesson__lesson_type", "lesson__order_number")
-    )
-    attendance = Attendance.objects.filter(student=student).select_related(
-        "lesson__assignment__discipline"
-    ).order_by("lesson__assignment__discipline__name", "lesson__order_number")
+
+    assignments = TeacherAssignment.objects.filter(
+        group=student.group, is_active=True
+    ).select_related("discipline", "semester", "teacher")
+
+    discipline_summaries = []
+
+    for assignment in assignments:
+        all_lessons = list(assignment.lessons.order_by("lesson_type", "order_number"))
+        total_max_grade = sum(l.max_grade for l in all_lessons if l.max_grade is not None)
+
+        # Оцінки за заняття
+        grades = Grade.objects.filter(
+            student=student, lesson__assignment=assignment, grade_type=Grade.GradeType.CURRENT
+        ).select_related("lesson")
+        grade_map = {g.lesson_id: g.value for g in grades}
+
+        # Відсутності
+        absences = Attendance.objects.filter(
+            student=student, lesson__assignment=assignment, status=Attendance.Status.ABSENT
+        )
+        absences_set = {a.lesson_id for a in absences}
+
+        total_score = sum(grade_map.values())
+
+        percentage = (total_score / total_max_grade * 100) if total_max_grade > 0 else 0
+        if total_max_grade > 0:
+            ects, national = get_ects_and_national(percentage)
+        else:
+            ects, national = get_ects_and_national(total_score)
+
+        # Детальна сітка занять для відомості
+        lesson_details = []
+        for l in all_lessons:
+            is_absent = l.id in absences_set
+            grade_val = grade_map.get(l.id)
+            if is_absent:
+                val_display = "н"
+            elif grade_val is not None:
+                val_display = str(grade_val)
+            else:
+                val_display = ""
+
+            lesson_details.append({
+                "lesson": l,
+                "grade": val_display,
+                "is_absent": is_absent,
+            })
+
+        discipline_summaries.append({
+            "assignment": assignment,
+            "total_score": total_score,
+            "total_max_grade": total_max_grade,
+            "ects": ects,
+            "national": national,
+            "lesson_details": lesson_details,
+        })
+
     return render(
-        request, "journal/student_grades.html", {"student": student, "grades": grades, "attendance": attendance}
+        request,
+        "journal/student_grades.html",
+        {
+            "student": student,
+            "discipline_summaries": discipline_summaries,
+        }
     )

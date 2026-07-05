@@ -33,6 +33,8 @@
         <th colspan="{{ group|length }}" class="text-center">{{ type_label }}</th>
       {% endfor %}
       <th rowspan="2" class="align-middle text-center" style="min-width: 60px;">Σ</th>
+      <th rowspan="2" class="align-middle text-center" style="min-width: 60px;">ECTS</th>
+      <th rowspan="2" class="align-middle text-center" style="min-width: 100px;">Оцінка</th>
     </tr>
     <tr>
       {% for lesson in all_lessons %}
@@ -44,7 +46,7 @@
     {# ===== РЯДОК МАКСИМАЛЬНИХ ОЦІНОК (виділений жовтим) ===== #}
     <tr style="background-color: #fff3cd;">
       <td class="fw-bold" style="background-color: #fff3cd; position: sticky; left: 0; z-index: 1;">
-        <span class="text-warning-emphasis">⚙ Макс. оцінка</span>
+        <span class="text-warning-emphasis">⚙  Макс. оцінка (Σ: {{ total_max_grade }})</span>
       </td>
       {% for lesson in all_lessons %}
         <td class="text-center p-1" style="background-color: #fff3cd;">
@@ -56,6 +58,8 @@
                  placeholder="—">
         </td>
       {% endfor %}
+      <td class="text-center fw-bold" style="background-color: #fff3cd;">—</td>
+      <td class="text-center fw-bold" style="background-color: #fff3cd;">—</td>
       <td class="text-center fw-bold" style="background-color: #fff3cd;">—</td>
     </tr>
     {# ===== РЯДКИ СТУДЕНТІВ ===== #}
@@ -77,6 +81,8 @@
         </td>
       {% endfor %}
       <td class="text-center fw-bold cell-total" data-student-id="{{ row.student.id }}">{{ row.total }}</td>
+      <td class="text-center fw-bold cell-ects {% if row.ects == 'FX' or row.ects == 'F' %}text-danger{% else %}text-success{% endif %}" data-student-id="{{ row.student.id }}">{{ row.ects }}</td>
+      <td class="text-center cell-national {% if row.ects == 'FX' or row.ects == 'F' %}text-danger{% else %}text-success{% endif %}" data-student-id="{{ row.student.id }}">{{ row.national }}</td>
     </tr>
     {% empty %}
     <tr><td colspan="{{ all_lessons|length|add:2 }}" class="text-muted">Немає студентів у групі.</td></tr>
@@ -145,6 +151,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  const totalMaxGrade = {{ total_max_grade|default:0 }};
+
+  function getEctsAndNational(percentage) {
+    if (percentage >= 90) return { ects: 'A', nat: 'Відмінно' };
+    if (percentage >= 82) return { ects: 'B', nat: 'Добре' };
+    if (percentage >= 74) return { ects: 'C', nat: 'Добре' };
+    if (percentage >= 64) return { ects: 'D', nat: 'Задовільно' };
+    if (percentage >= 60) return { ects: 'E', nat: 'Задовільно' };
+    if (percentage >= 35) return { ects: 'FX', nat: 'Незадовільно (FX)' };
+    return { ects: 'F', nat: 'Незадовільно (F)' };
+  }
+
   function recalcTotal(studentId) {
     let sum = 0;
     document.querySelectorAll(`.cell-grade[data-student-id="${studentId}"]`).forEach(inp => {
@@ -153,6 +171,24 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     const totalCell = document.querySelector(`.cell-total[data-student-id="${studentId}"]`);
     if (totalCell) totalCell.textContent = sum || 0;
+
+    const ectsCell = document.querySelector(`.cell-ects[data-student-id="${studentId}"]`);
+    const natCell = document.querySelector(`.cell-national[data-student-id="${studentId}"]`);
+    if (ectsCell && natCell) {
+      const pct = totalMaxGrade > 0 ? (sum / totalMaxGrade * 100) : sum;
+      const grades = getEctsAndNational(pct);
+      
+      ectsCell.textContent = grades.ects;
+      natCell.textContent = grades.nat;
+
+      if (grades.ects === 'FX' || grades.ects === 'F') {
+        ectsCell.className = 'text-center fw-bold cell-ects text-danger';
+        natCell.className = 'text-center cell-national text-danger';
+      } else {
+        ectsCell.className = 'text-center fw-bold cell-ects text-success';
+        natCell.className = 'text-center cell-national text-success';
+      }
+    }
   }
 
   async function saveCell(input) {
